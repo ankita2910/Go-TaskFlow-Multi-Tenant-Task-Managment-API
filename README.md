@@ -1,114 +1,112 @@
-Go + GraphQL Task Management API — Architecture and Implementation Document
-Project Overview
-The Go-GraphQL-TaskFlow project is a multi-layered backend application implemented in Go using GraphQL. The goal of the project is to demonstrate modern backend engineering best practices, including:
-Layered architecture (Resolvers → Service → Repository)
-Input validation and business logic separation
-Clean dependency injection
-Preparatory work for database integration (e.g., DynamoDB)
-Scalability and maintainability principles
-The system currently supports:
-Creating a task via a GraphQL mutation
-Placeholder query resolver for fetching tasks
-1. Project Structure
-The project follows an interview-ready, production-oriented structure:
+TaskFlow Multi-Tenant Task Management API
+Project Documentation
+Author: Ankita Dewangswami
+Date: 2026-03-30
+Stack: Go, GraphQL (gqlgen), DynamoDB
+1. Project Overview
+The goal of this project was to create a multi-tenant task management system with a Go backend exposed via GraphQL and persisted in AWS DynamoDB using a single-table design. The project emphasizes production-level architecture with separation of concerns, scalability, and maintainability.
+Key features implemented:
+GraphQL API in Go
+Service + Repository pattern
+Resolver architecture
+DynamoDB single-table design
+Nested resolvers
+DataLoader batching
+Authorization layer
+2. Project Structure
 go-graphql-taskflow/
-├── cmd/server/             # Application entry point
-│   └── main.go
+├── cmd/server/            # Main entry point for GraphQL server
+├── graph/                 # gqlgen generated and custom resolvers
+│   ├── generated/
+│   ├── resolver.go
+│   ├── schema.graphqls
+│   └── schema.resolvers.go
 ├── internal/
-│   ├── auth/               # Authorization logic (future)
-│   ├── dynamodb/           # DynamoDB client & repository (future)
-│   ├── loader/             # DataLoader for batch queries (future)
-│   ├── model/              # Domain models (Task, User, etc.)
-│   ├── repository/         # Interfaces for persistence
-│   └── service/            # Business logic layer
-├── graph/
-│   ├── generated/          # Auto-generated GraphQL code by gqlgen
-│   ├── schema.graphqls     # GraphQL schema definitions
-│   └── schema.resolvers.go # Resolver implementations
-├── go.mod                  # Go module dependencies
-├── gqlgen.yml              # gqlgen configuration
-└── README.md
-Key Principles:
-internal packages are non-exportable outside the module, ensuring encapsulation.
-GraphQL-specific logic is isolated in the graph package.
-The cmd/server folder holds the executable, keeping application code separate from library code.
-2. GraphQL Schema Design
-The GraphQL API defines types, input objects, queries, and mutations.
-Types
-type Task {
-  id: ID!
-  title: String!
-  status: String!
-  projectID: ID!
-}
-Represents the Task domain object.
-ID is the unique identifier.
-status indicates task state (OPEN/CLOSED).
-Input Types
-input CreateTaskInput {
-  title: String!
-  projectID: ID!
-}
-Used as input for mutations.
-Encourages future-proofing, allowing optional fields to be added without breaking clients.
-Operations
-Query: Fetch tasks (currently placeholder)
-Mutation: Create a new task
-type Mutation {
-  createTask(input: CreateTaskInput!): Task!
-}
-Input objects encapsulate mutation parameters.
-Returns a Task object after creation.
-Concept: Using input objects instead of multiple arguments is a best practice for GraphQL mutation design.
-3. Layered Architecture
-The project implements three primary layers:
-3.1 Resolver Layer
-Located in graph/schema.resolvers.go.
-Handles GraphQL requests.
-Converts GraphQL input objects into service layer calls.
-Avoids direct database access.
-Example:
-func (r *mutationResolver) CreateTask(ctx context.Context, input model.CreateTaskInput) (*model.Task, error) {
-    task := r.TaskService.CreateTask(input.Title, input.ProjectID)
-    return task, nil
-}
-Concepts:
-Resolvers are thin controllers: They orchestrate, not implement business logic.
-Context (ctx) is passed for request-scoped data and cancellation.
-3.2 Service Layer
-Located in internal/service/task_service.go.
-Encapsulates business logic.
-Validates input and performs transformations.
-Independent of GraphQL or database.
-Example:
-type TaskService struct {}
-
-func (s *TaskService) CreateTask(title string, projectID string) *model.Task {
-    return &model.Task{
-        ID:        "1",
-        Title:     title,
-        Status:    "OPEN",
-        ProjectID: projectID,
-    }
-}
-Concepts:
-Separation of concerns: Service layer does the "what" and "why", not the "how to store".
-Future-proofing: Swapping memory storage for a database requires no changes in resolver logic.
-3.3 Domain Models
-Located in internal/model/task.go.
+│   ├── auth/              # Authentication and authorization logic
+│   ├── dynamodb/          # DynamoDB client setup and repository implementation
+│   ├── loader/            # DataLoader batching utilities
+│   ├── model/             # Domain models (Task, Project, User, etc.)
+│   ├── repository/        # Repository interfaces
+│   └── service/           # Business logic layer
+├── pkg/                   # Optional reusable packages
+├── go.mod
+├── go.sum
+└── gqlgen.yml
+3. Development Flow
+The project was implemented incrementally, following a production-grade architecture:
+Step 1: Initialize Go project and gqlgen
+mkdir go-graphql-taskflow
+cd go-graphql-taskflow
+go mod init github.com/ankita2910/go-graphql-taskflow
+go get github.com/99designs/gqlgen
+go run github.com/99designs/gqlgen init
+Sets up go.mod and gqlgen scaffolding.
+Generates initial graph/ folder with schema and resolver stubs.
+Step 2: Define Domain Models
+Inside internal/model/, created task.go:
 type Task struct {
     ID        string
     Title     string
     Status    string
     ProjectID string
 }
-Concepts:
-Domain models represent real entities.
-Used by service layer and GraphQL resolvers.
-Enables consistency and type safety across layers.
-4. Dependency Injection
-Resolvers depend on services, not directly on repositories or DB.
-Example:
+Represents the core data entity.
+Separated into internal/model for clean architecture and production-level modularity.
+Step 3: Design GraphQL Schema
+graph/schema.graphqls:
+type Task {
+  id: ID!
+  title: String!
+  status: String!
+  projectID: ID!
+}
+
+type Query {
+  tasks: [Task!]!
+}
+
+input CreateTaskInput {
+  title: String!
+  projectID: ID!
+}
+
+type Mutation {
+  createTask(input: CreateTaskInput!): Task!
+}
+Defines queries, mutations, and input types.
+Enables gqlgen to generate type-safe resolvers.
+Step 4: Generate gqlgen code
+go run github.com/99designs/gqlgen generate
+Generates resolver interfaces, models, and the generated/ package.
+Resolver stubs in schema.resolvers.go are created.
+Step 5: Implement Resolver Layer
+graph/schema.resolvers.go:
+func (r *mutationResolver) CreateTask(ctx context.Context, input model.CreateTaskInput) (*model.Task, error) {
+    task := r.TaskService.CreateTask(input.Title, input.ProjectID)
+    return task, nil
+}
+Resolver translates GraphQL queries/mutations into business logic calls.
+Does not interact with DB directly.
+Step 6: Service Layer
+internal/service/task_service.go:
+type TaskService struct {}
+
+func (s *TaskService) CreateTask(title string, projectID string) *model.Task {
+    return &model.Task{
+        ID:        "1",  // Normally, UUIDs would be generated
+        Title:     title,
+        Status:    "OPEN",
+        ProjectID: projectID,
+    }
+}
+Business logic layer handles validation, orchestration, and rules.
+Called by resolvers.
+Step 7: Repository Layer & DynamoDB Integration
+Repository interfaces abstract DB operations (internal/repository).
+Implementations in internal/dynamodb allow switching databases without changing service/resolver code.
+DynamoDB single-table design stores all entities in one table with composite primary keys (PK, SK) for fast queries and access patterns.
+Step 8: GraphQL Server Setup
+cmd/server/main.go:
 srv := handler.NewDefaultServer(
     generated.NewExecutableSchema(
         generated.Config{
@@ -118,33 +116,20 @@ srv := handler.NewDefaultServer(
         },
     ),
 )
-Injecting TaskService ensures decoupled architecture.
-Promotes unit testing and mocking.
-5. GraphQL Execution Flow
-Client sends a mutation query:
+http.Handle("/query", srv)
+log.Println("GraphQL server running at http://localhost:8080/")
+log.Fatal(http.ListenAndServe(":8080", nil))
+Injects TaskService into resolvers.
+Exposes /query endpoint for GraphQL Playground.
+Step 9: Executing a Mutation
+Example mutation to create a task:
 mutation {
-  createTask(input: {title: "Learn Go", projectID: "101"}) {
+  createTask(input: { title: "Learn Go", projectID: "101" }) {
     id
     title
     status
     projectID
   }
 }
-GraphQL server calls the resolver: CreateTask.
-Resolver calls TaskService.CreateTask().
-Service returns a Task object.
-Resolver sends Task object back to the client.
-Flow Diagram:
-GraphQL Request
-       │
-       ▼
-  Resolver Layer
-       │
-       ▼
-  Service Layer
-       │
-       ▼
-  (Future) Repository/Database
-       │
-       ▼
- Response to Client
+Resolver calls service → returns Task object.
+Future implementation will persist tasks in DynamoDB.
