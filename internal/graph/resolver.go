@@ -9,4 +9,5 @@ import (
 )
 type Resolver struct{
 	TaskService *service.TaskService
+	CommentService *service.CommentService
 }

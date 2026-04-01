@@ -1,18 +1,31 @@
 package service
 
-import "go-graphql-taskflow/internal/graph/model"
+import (
+    "context"
 
-type TaskService struct{}
+    "go-graphql-taskflow/internal/graph/model"
+    "go-graphql-taskflow/internal/repository"
 
-func NewTaskService() *TaskService {
-	return &TaskService{}
+    "github.com/google/uuid"
+)
+
+type TaskService struct {
+    Repo repository.TaskRepository
 }
 
-func (s *TaskService) CreateTask(title string, projectID string) *model.Task {
-	return &model.Task{
-		ID:    "1",
-		Title: title,
-		Status:    "OPEN",
+func NewTaskService(repo repository.TaskRepository) *TaskService {
+    return &TaskService{
+        Repo: repo,
+    }
+}
+
+func (s *TaskService) CreateTask(title, projectID string) (*model.Task, error) {
+    task := &model.Task{
+        ID:        uuid.NewString(),
+        Title:     title,
+        Status:    "OPEN",
         ProjectID: projectID,
-	}
+    }
+    err := s.Repo.CreateTask(context.Background(), task)
+    return task, err
 }
