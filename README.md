@@ -1,8 +1,5 @@
 Go GraphQL Project: Conceptual Overview
 
-
-
-
 1. Project Goal
 Built a multi-tenant task management GraphQL API using Go.
 The main objectives were:
